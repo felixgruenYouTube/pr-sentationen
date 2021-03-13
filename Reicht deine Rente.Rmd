@@ -1,0 +1,557 @@
+---
+title: "Reicht deine Rente?"
+author: "felixgruen."
+date: '`r format(Sys.time(), "%d. %B, %Y")`'
+output:
+  ioslides_presentation: 
+    incremental: yes
+    logo: Logo.PNG
+    smaller: yes
+    widescreen: yes
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r packages, include=FALSE}
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(data.table, tidyverse, plotly)
+
+# loading packages
+pkgs <- c("data.table", "tidyverse", "plotly")
+sapply(pkgs, require, character.only = TRUE)
+```
+
+# Neue Playlist: Altersvorsorge
+
+## Hauptfragen für dieses Video
+
+- Reicht deine (gesetzliche) Rente aus? - Rentenlücke
+    + Wie hoch wird deine gesetzliche Rente sein? - Rentenhöhe
+    + Wie hoch ist dein Bedarf bei der Rente? - Rentenbedarf
+  
+- Hinweis: Alle Euro-Angaben sollen reale Werte darstellen. Bsp.: Wenn ich sage, ich brauche in 2040 2000 Euro, dann meine ich 2000 Euro nach heutigem Kaufwert. Im Jahr 2040 wären 2000 heutige Euro etwa `2000*1.02^29`, also 3551.69 Euro, wert.
+  
+## Wie den Rentenbedarf ermitteln?
+
+Zwei Möglichkeiten:
+
+1. Faustformel: 80 % des letzten Nettoeinkommens
+    + Quick, aber Dirty
+    + Mein Fall: 80 % von 2600 Euro sind **2280 Euro Rentenbedarf**
+    + Problem: Nicht mein gesamtes Nettoeinkommen basiert auf einem Angestelltenverhältnis.
+2. Genauen Bedarf bestimmen, z.B. über ein Haushaltsbuch
+    + Genauer, mehr individuell abgestimmt
+    + Besser geeignet für Konzept der "Finanziellen Freiheit"
+    + Mein Fall: **1100 Euro** (Ausgaben im Jahr 2020)
+3. Fazit: **1100 Euro wird wohl das Minimum sein und 2280 Euro das Maximum.**
+
+## Interaktiv | Rentenbedarf ermitteln 
+
+*Wenn dich interessiert, wie sich deine finanzielle Situation zum "Durchschnitt" verhält, dann hast du im Laufe der Präsentation die Möglichkeit, deine eigenen Zahlen einzugeben. Im nächsten Slide geht es um deine monatlichen Ausgaben, die dann eine Schätzung für deinen Rentenbedarf ergeben.*
+
+*Alle dynamischen Zahlenangaben, also jene, die davon abhängen, was du angegeben hast, werden* <span style="color:darkred">**fett und rot**</span> *markiert, damit du weißt, dass es sich um deine Angaben handelt.*
+
+## Rentenbedarf ermitteln 
+
+```{r}
+numericInput(
+  "Wohnen", "Wohnen: Wohnen, Energie und Wohnunginstandhaltung",
+  value = 530)
+
+numericInput(
+  "Lebensmittel", "Lebensmittel: Nahrungmittel, Getränke und Tabak",
+  value = 250)
+
+numericInput(
+  "Verkehr", "Verkehr: PKW, Öffentliche Verkehrsmittel",
+  value = 130)
+
+numericInput(
+  "Freizeit", "Freizeit: Unterhaltung und Kultur, Post und Kommunikation",
+  value = 30)
+
+numericInput(
+  "Kleidung", "Bekleidung: Bekleidung und Schuhe",
+  value = 50)
+
+numericInput(
+  "Sonstige", "Sonstige",
+  value = 180)
+```
+
+## Deine Ausgaben im Vergleich zum Durchschnitt
+
+```{r}
+Rentenbedarf = reactive({ 
+  input$Wohnen + input$Lebensmittel + input$Verkehr + input$Freizeit + input$Kleidung + input$Sonstige
+  })
+
+# Durchschnittsausgaben
+ges = 3189
+wohnen = round(.324*ges*.5, 2)
+nahrung = round(.13*ges*.5, 2)
+verkehr = round(.1384*ges*.5, 2)
+freizeit = round(.119*ges*.5, 2)
+kleidung = round(.042*ges*.5, 2)
+sonstige = round(.246*ges*.5, 2)
+
+sumGes = sum(c(wohnen,nahrung,verkehr,freizeit,kleidung,sonstige))
+```
+
+## Vergleich: [Durchschnittspaar ohne Kind 2018](https://www.destatis.de/DE/Service/Statistik-Campus/Datenreport/Downloads/datenreport-2021-kap-6.html)
+
+- **Gesamt: `r sumGes` € vs.<span style="color:darkred">`r renderText(Rentenbedarf())` €</span> **
+  
+```{r}
+QuelleKategorie = rep(c("Paar ohne Kind", "Deine Ausgaben"), each = 6)
+KategorieKategorie = rep(c("Wohnen", "Lebensmittel", "Verkehr", "Freizeit", "Kleidung", "Sonstiges"), 2)
+
+kategorieData = reactive({
+  AusgabenKategorie = c(wohnen, nahrung, verkehr, freizeit, kleidung, sonstige,
+                      input$Wohnen, input$Lebensmittel, input$Verkehr, input$Freizeit, input$Kleidung, input$Sonstige)
+  
+  kategorieData = data.table(Quelle = QuelleKategorie,
+                             x = KategorieKategorie,
+                             y = AusgabenKategorie
+                             )
+  })
+```
+
+```{r}
+renderPlotly({
+  kategorieData = kategorieData()
+ggplot(kategorieData, aes(x=x, y=y, fill=Quelle)) +
+  geom_col(position = position_dodge(), width=.5) +
+  xlab("Kategorie") +
+  ylab("Ausgaben in EUR") +
+  coord_flip() +
+  theme_minimal() +
+  theme()
+})
+```
+
+## Dein Rentenbedarf | [Vergleich Durchschnittsausgaben 2018](https://www.destatis.de/DE/Service/Statistik-Campus/Datenreport/Downloads/datenreport-2021-kap-6.html)
+
+```{r}
+Quelle = c("Paar mit Kind", "Paar ohne Kind", "Alleinerziehende*r", "Alleinlebende*r", "Dein Rentenbedarf")
+Ausgaben = reactive({
+  c(3832/2, 3189/2, 2208, 1706, Rentenbedarf()
+    )
+  })
+interaktiv = c("nein", "nein", "nein", "nein", "ja")
+
+konsumData = reactive({
+  Ausgaben = Ausgaben()
+  konsumData = data.table(Quelle = Quelle, 
+                          `Ausgaben (in EUR)` = Ausgaben,
+                          interaktiv = interaktiv
+                          )
+  konsumData[, Quelle := fct_reorder(Quelle, `Ausgaben (in EUR)`)]
+  })
+```
+
+```{r}
+renderPlotly({
+  konsumData = konsumData()
+ggplot(konsumData, aes(x=Quelle, y=`Ausgaben (in EUR)`, fill=interaktiv)) +
+  geom_col(width=.5) +
+  xlab("") +
+  coord_flip() +
+  theme_minimal() +
+  theme(legend.position = "none")
+})
+```
+
+## Hauptfragen für dieses Video
+
+- Reicht deine (gesetzliche) Rente aus?
+    + Wie hoch wird deine gesetzliche Rente sein? - Rentenhöhe
+    + **Wie hoch ist dein Bedarf bei der Rente? - Rentenbedarf**
+    
+# Wie hoch wird deine gesetzliche Rente sein?
+
+## Wie hoch wird deine gesetzliche Rente sein?
+
+1. Die Gesetzliche Rentenversicherung
+2. Deine (geschätzte) Rentenhöhe
+
+## Das Drei-Säulen-Modell
+
+Altervorsorge funktioniert über drei sog. "Säulen".
+
+1. Säule: *gesetzlich*
+    - **Gesetzliche Rentenversicherung**
+
+2. Säule: *betrieblich*
+    - Betriebliche Altersvorsorge (für Arbeitnehmer*innen)
+
+3. Säule: *privat*
+    - Staatlich gefördert
+      - Riester- oder Rürup-Rente
+    - Nicht gefördert
+      - Renten- oder Lebensversicherungen
+      - ETF-Sparpläne
+
+## 1. Säule | Die Gesetzliche Rentenversicherung
+
+- Staatliche Leistung, die einen gegen bestimmte Risiken absichert
+  - Alter 
+    - **Altersrente**
+  - Erwerbsunfähigkeit 
+    - Rente wegen verminderter Erwerbsfähigkeit (Erwerbsminderungsrente)
+  - Tod
+    - Hinterbliebenenrente 
+
+## Wer muss in die Gesetzliche Rentenversicherung (GRV) einzahlen?
+
+- **Nicht-Selbständige** sind **pflichtversichert**
+
+- **Selbständige** sind **nicht** pflichtversichert
+  
+# Interaktiv | Rentenstory (Teil 1 von 3)
+
+## Rentenstory: Erste Frage
+
+Um herauszfinden, wie hoch deine Rente in Zukunft sein wird, musst du drei Fragen beantworten. 
+
+Es geht los mit der ersten:
+
+```{r}
+sliderInput(
+  "Beitragsjahre", "Wie viele Jahre hast du in die Rentenkasse eingezahlt?",
+  value = 28, min = 10, max = 50, step = 1
+  )
+```
+
+- Danke, du hast also <span style="color:darkred">**`r renderText(input$Beitragsjahre)` Jahre**</span> in die Rentenkasse eingezahlt.
+- Bist du Durchschnitt?
+
+## Deine Beitragsjahre vs. [Durchschnitt 2019](https://www.auswandern-handbuch.de/durchschnittsrente-deutschland/) 
+
+```{r}
+beitragData = data.table(
+  Bundesland = c("alt", "alt", "neu", "neu"),
+  Geschlecht = c("Frau", "Mann", "Frau", "Mann"),
+  Beitragsjahre = c(28.04, 40.64, 41.06, 44.56)
+)
+
+renderPlotly({
+  ggplot(beitragData, aes(x=Bundesland, y = Beitragsjahre, fill = Geschlecht)) +
+    geom_col(position = position_dodge(), width = .5) +
+    geom_text(aes(label = Beitragsjahre)) +
+    annotate(geom = "text", x = .75, y = input$Beitragsjahre  + 3, label = paste(input$Beitragsjahre, "Jahre"), size = 8) +
+    geom_hline(yintercept = input$Beitragsjahre, alpha = .8) +
+    scale_y_continuous(breaks = seq(0,50,5)) +
+    theme_minimal()
+})
+
+# https://www.auswandern-handbuch.de/durchschnittsrente-deutschland/
+```
+
+## Wie funktioniert die gesetzliche Rente?
+
+- **Generationenvertrag** (auch: Umlageverfahren)
+  - Heutige Beitragszahlende bezahlen für
+  - Heutige Rentner*innen
+  - Steigen die Löhne, werden auch die Rentenleistungen erhöht ([2020: +3,45 % West bzw. +4,2 % Ost](https://www.deutsche-rentenversicherung.de/DRV/DE/Ueber-uns-und-Presse/Presse/Meldungen/2020/200320_rentenanpassung_2020.html))
+
+- Problem: **Demographischer Wandel**
+  - Menschen leben immer länger
+  - Anteil älterer Menschen wird größer
+
+<div class="centered"> 
+- **Immer weniger Beitragszahlende müssen für immer mehr Rentner\*innen sorgen.**
+</div>
+
+- Wie reagiert der Staat?
+    - Steigende Beiträge = mehr zahlen
+    - Sinkende Leistungen = weniger bekommen
+      - Rentenanpassungen halten nicht 1:1 mit den Lohnanpassungen mit (Nachhaltigkeitsfaktor)
+      
+## Rentenbeiträge
+
+- Beitragssatz seit 2018: 18,6 % (jeweils hälftig Arbeitnehmer\*in bzw. Arbeitgeber\*in)
+- Große Koalition hat sich auf einen [Anstieg](https://www.haufe.de/sozialwesen/versicherungen-beitraege/rentenversicherungsbeitrag_240_429148.html) bis auf nicht mehr als 20 % bis 2025 geeinigt
+- 2021 liegt die  [*Beitragsbemessungsgrenze*](https://www.bundesregierung.de/breg-de/aktuelles/beitragsbemessungsgrenzen-2021-1796480) bei 7100 Euro (West) bzw. 6700 Euro (Ost) monatlich
+  - entspricht einem Beitrag von `r round(7100*.186/2, 2)` bzw. `r round(6700*.186/2, 2)` Euro bei hälftiger Anrechnung
+
+# Interaktiv | Rentenstory (Teil 2 von 3)
+
+## Rentenstory: Dritte Frage
+
+Wir nähern uns dem Ende deiner Rentenstory. Bisher sieht's so aus:
+
+- Du hast <span style="color:darkred">**`r renderText(input$Beitragsjahre)` Jahre**</span> in die Rentenkasse eingezahlt
+- Die dritte Frage lautet: Wie viel verdienst du im Vergleich zum Durchschnitt? Gib also den Faktor an, der sich aus deinem Jahresbruttogehalt und dem Durchschnittseinkommen ergibt. Die relevanten Angaben für das Durchschnittseinkommmen findest du [hier](https://sozialversicherung-kompetent.de/rentenversicherung/zahlen-werte/1006-durchschnittsentgelt.html). Das vorläufige Durchschnittseinkommen in 2021 beträgt 41.541 Euro.
+- *Mein Fall: `42014.61/41541`, also Faktor (gerundet): 1.00*
+
+```{r}
+## EG-Fragen
+sliderInput(
+  "Einkommen", "Wie hoch ist dein Einkommen im Vergleich zum Durchschnitt? Gib den Faktor an.",
+  value = 1, min = .3, max = 2, step = .05)
+```
+
+- Danke, du hast also <span style="color:darkred">**`r renderText(input$Einkommen)`**</span>-Mal so viel wie der Schnitt der Versicherten verdient.
+
+# Rentenleistung | Wie viel Rente kannst du im Alter erwarten?
+## Erster Anhaltspunkt | **Das Rentenniveau**
+
+<div class="centered">
+**Rentenreform** 2004:
+
+"**Mindestrentenniveau** für das Jahr 2030 liegt bei 43 %."
+</div>
+
+- **Rentenreform**
+  - ein Gesetz in Bezug auf die GRV. Es regelt:
+    - Leistungen,
+    - Beiträge oder
+    - die Organisation
+
+## Das Rentenniveau 
+
+- **Rentenniveau** (auch: *Standardrentenniveau* genannt)
+  - $\frac{Standardrente}{Durchschnittseinkommen}$ 
+    - Rentenniveau 2021: [49,8 %](https://www.ihre-vorsorge.de/nachrichten/lesen/rentenniveau-wird-ab-2021-deutlich-steigen.html)
+  - **Standardrente**???
+
+- Rentenformel:
+  - $Rente = EG * ZF * RF * RW$
+    - EG: Entgeltpunkte; Punkte, die vom Einkommen abhängen
+    - ZF: Zugangsfaktor; ob man früher oder später in Rente geht
+    - RF: Rentenfaktor; welche Art von Rente bezogen wird (Altersrente: Faktor = 1)
+    - RW: aktueller Rentenwert;  wird jährlich bestimmt ([2021](https://www.haufe.de/sozialwesen/leistungen-sozialversicherung/rentenerhoehung-kommt-zum-1-juli_242_405920.html): 34,19 Euro)
+    
+## Das Rentenniveau II | Die Standardrente: Steffi Standard  
+
+- Für die Berechnung der Standardrente (2021) gilt:
+  - EG = 45
+    - Jemand, der 45 Jahre lang immer durchschnittlich viel verdient hat
+  - ZF = 1 
+    - Jemand, der "regulär" die Rente beginnt (zur Zeit mit 67 Jahren) 
+  - RF = 1 
+    - Der Faktor für die Altersrente
+  - RW = 34,19 Euro (jahresabhängig)
+    - Besteht eigentlich aus zwei Werten, weil pro Jahreshälfte ein Rentenwert ermittelt wird
+
+## Das Rentenniveau III | Steffi Standards Rente im Jahr 2021 {.columns-2} 
+
+```{r Standardrente, echo=T}
+EG = 45; ZF = 1; RF = 1; RW = 34.19
+StandardRente = EG*ZF*RF*RW
+```
+
+- Steffi Standard bezog 2021 eine Standardrente von `r StandardRente` Euro brutto.
+- In der Grafik siehst du die in [2019](https://www.deutsche-rentenversicherung.de/SharedDocs/Downloads/DE/Statistiken-und-Berichte/statistikpublikationen/aktuelle_daten.html) durchschnittlich ausgezahlten Renten.
+  - Die Standardrente ist **nicht repräsentativ**.
+  
+```{r}
+bruttoData = data.table(
+  Geschlecht = c("Frau", "Mann", "Frau", "Mann"),
+  Bruttorente = c(728, 1140, 1034, 1100),
+  Bundesland = c("West", "West", "Ost", "Ost")
+)
+
+renderPlot({
+  ggplot(bruttoData, aes(x=Bundesland, y = Bruttorente, fill = Geschlecht)) +
+    geom_col(position = position_dodge()) +
+    geom_text(aes(label = Bruttorente)) +
+    # Steffi Standard
+    annotate(geom = "text", x = 1, y = StandardRente  - 20, label = "Steffi Standard", size = 8, alpha = .8) +
+    geom_hline(yintercept = StandardRente) +
+    theme_minimal()
+})
+```
+
+# Interaktiv | Rentenstory (Teil 3 von 3)
+## Rentenstory: Dritte Frage {.columns-2}
+
+Vielleicht kannst du schon erahnen, in welche Richtung es geht.
+
+- Du hast <span style="color:darkred">**`r renderText(input$Beitragsjahre)` Jahre**</span> Jahre in die Rentenkasse eingezahlt,
+- und dein Einkommen war <span style="color:darkred">**`r renderText(input$Einkommen)`**</span>-Mal so hoch wie der Durchschnitt.
+
+- Nun, jetzt kommt die letzte Frage:
+
+```{r}
+dt_zugang <- fread("zugangsfaktor.csv", header=F)
+dt_zugang <- dt_zugang[, .(zugang = V1, faktor = V2)]
+  
+## ZF-Fragen
+sliderInput(
+  "Eintritt", "Bist du früher oder später als regulär in Rente gegangen (in Jahren)?",
+  value = 0, min = -5, max = 5, step = 1)
+
+Eintritt <- renderText(ifelse(input$Eintritt < 0, "früher als die",
+                              ifelse(input$Eintritt == 0, "zur",
+                                     "später als die")
+                              )
+                       )
+EintrittJahre <- renderText(ifelse(input$Eintritt == 0, "(super)",
+                                     paste("(", input$Eintritt, "Jahre)")
+                                   )
+                              )
+```
+
+- Danke, du hast deinen Ruhestand also <span style="color:darkred">**`r Eintritt` Regelaltersrente**</span> begonnen.
+
+## Fazit I | Reicht deine Rente aus?
+
+Hello, hier die Zusammenfassung deiner bisherigen Angaben:
+
+- Du hast <span style="color:darkred">**`r renderText(input$Beitragsjahre)` Jahre**</span> Jahre in die Rentenkasse eingezahlt,
+- dein Einkommen war <span style="color:darkred">**`r renderText(input$Einkommen)`**</span>-Mal so hoch wie der Durchschnitt.
+- und du bist <span style="color:darkred">**`r Eintritt` Regelaltersrente**</span> `r EintrittJahre` in den Ruhestand gegangen.
+
+```{r DeineDurchschnitt, echo=T}
+DeineRente = renderText({
+  EG = input$Beitragsjahre*input$Einkommen
+  ZF = dt_zugang[zugang==input$Eintritt, faktor]
+  RF = 1; RW = 34.19
+
+  round(EG*ZF*RF*RW, 2)
+  })
+```
+
+- Deine Rente 2021: <span style="color:darkred">**`r DeineRente` Euro brutto**</span>
+- Steffi Standard 2021: `r StandardRente` Euro brutto
+
+## Fazit II | Reicht deine Rente aus?
+
+```{r}
+renderPlotly({
+  EG = input$Beitragsjahre*input$Einkommen
+  ZF = dt_zugang[zugang==input$Eintritt, faktor]
+  RF = 1; RW = 34.19
+  DeineRente = round(EG*ZF*RF*RW, 2)
+
+  
+  ggplot(bruttoData, aes(x=Bundesland, y = Bruttorente, fill = Geschlecht)) +
+    geom_col(position = position_dodge()) +
+    geom_text(aes(label = Bruttorente)) +
+    # Steffi Standard
+    annotate(geom = "text", x = 1, y = StandardRente  - 20, label = "Steffi Standard", size = 8, alpha = .8) +
+    geom_hline(yintercept = StandardRente) +
+    # Rentenstory
+    annotate(geom = "text", x = 1, y = DeineRente  - 20, label = "Deine Rente", size = 8, alpha = .8) +
+    geom_hline(yintercept = DeineRente) +
+    theme_minimal()
+})
+```
+
+## Fazit III | Reicht deine Rente aus?
+
+<div class="centered"> 
+  **Merke: Die gesetzliche Rente hängt vor allem von Beitragsjahren, Einkommen und dem Zeitpunkt des Renteneintritts ab!**
+</div>
+
+- Für viele Erwerbstätige ist die Standardrente und damit das Rentenniveau eine Überschätzung der zu erwartenden Rente.
+- Zukünftig kann mit steigenden Beiträgen und niedrigeren Leistungen gerechnet werden.
+
+# Reicht deine Rente aus?
+## Recap
+
+Was war das Ziel für heute
+
+- Reicht deine (gesetzliche) Rente aus? - Rentenlücke
+    + **Wie hoch wird deine gesetzliche Rente sein? - Rentenhöhe**
+    + **Wie hoch ist dein Bedarf bei der Rente? - Rentenbedarf**
+
+- $$ Rentenlücke = Rentenbedarf-Nettorente $$
+
+
+- Deine Bruttorente: <span style="color:darkred">**`r DeineRente` Euro**</span>
+
+- *Aber was macht das Netto?*
+
+# Deine Rentenlücke
+## Nettorenten-Rechner
+
+- Deine Bruttorente: <span style="color:darkred">**`r DeineRente` Euro**</span>
+- Finde [Deine Nettorente](https://www.finanzrechner.org/sonstige-rechner/rentenbesteuerungsrechner/) heraus! :)
+
+
+```{r}
+numericInput(
+  "DeineNettorente", "Deine Nettorente",
+  value = 853.32, min = 0, max = 3000, step = 50)
+```
+
+## Fazit: Reicht deine Rente aus? | Deine Rentenlücke
+
+```{r}
+DeineRentenluecke = renderText ({
+  Rentenbedarf = Rentenbedarf()
+  Rentenbedarf - input$DeineNettorente
+  })
+```
+
+```{r}
+Hauptantwort = renderText ({
+  Rentenbedarf = Rentenbedarf()
+  DeineRentenlueckeNum = Rentenbedarf - input$DeineNettorente
+  
+  ifelse(DeineRentenlueckeNum < 0, 
+                      "Hammer! Du brauchst dich nicht um eine zusätzliche Altersvorsorge zu kümmern. Deine gesetzliche Rente reicht aus!",
+                      "Leider nein! Falls es dich beruhigt, so geht es vielen. Es wäre also gut, wenn du dich um eine zusätzliche Altersvorsorge kümmerst."
+                      )
+  })
+```
+
+Schön, dass du es bis hierhin geschafft hast. Auf Basis deiner monatlichen Ausgaben, die du angegeben hast, beläuft sich dein **Rentenbedarf** auf <span style="color:darkred">**`r renderText({Rentenbedarf()})` Euro**</span>.
+
+Deine **Bruttorente** würde <span style="color:darkred">**`r DeineRente` Euro**</span> betragen, was netto <span style="color:darkred">**`r renderText({input$DeineNettorente})` Euro**</span> macht.
+
+Das wiederum heißt, dass du aus der Differenz deines Rentenbedarfs und deiner Nettorente deine persönliche **Rentenlücke** berechnen kannst. 
+
+**Deine Rentenlücke beträgt also <span style="color:darkred">`r DeineRentenluecke` Euro</span>.**
+
+Fazit: Reicht gesetzliche deine Rente aus? <span style="color:darkred">**`r Hauptantwort`**</span>
+
+## Fazit: Deine Rentenlücke
+
+```{r}
+renderPlotly({
+  Rentenbedarf = Rentenbedarf()
+  lueckeData = data.table(Art = c("Rentenbedarf", "Nettorente"),
+                          Wert = c(Rentenbedarf,
+                                  input$DeineNettorente)
+                          )
+  
+  ggplot(lueckeData, aes(x=Art, y = Wert, fill = Art)) +
+    geom_col() +
+    theme_minimal()
+    })
+```
+
+
+# Ausblick | Wie geht's weiter? 
+
+## Wie geht's weiter
+
+Videos zu...
+
+- Rentensysteme im Ländervergleiche
+- Betriebliche Altersvorsorge
+- Rentenlücke schließen
+
+## Lese- und Videoempfehlungen
+
+- [finanztip](https://www.finanztip.de)
+    - Für mich erste Anlaufstelle, wenn's sehr breit um das Thema Finanzen gehen soll.
+    - Unabhängig, immer sehr aktuell gehalten. 
+    - Da ist quasi alles dabei und bietet einen guten Überblick.
+    
+- [finanzfluss](https://www.youtube.com/channel/UCeARcCUiZg79SQQ-2_XNlXQ)
+    - Sehr guter Youtube-Channel
+    - Viele Themen auch um die Rente herum, super für erste Einblicke ins Thema *ETFs*.
+
+- [Talerbox](https://www.youtube.com/channel/UCeARcCUiZg79SQQ-2_XNlXQ)
+    - Auch wie Finanzfluss sehr zu empfehlen.
+    
+- [Offizielle Seite der Deutschen Rentenversicherung](https://www.deutsche-rentenversicherung.de/DRV/DE/Home/home_node.html)
+    - Mittelmäßig. Reicht für einen groben Überblick über die Gesetzliche Rente.
